@@ -1,7 +1,15 @@
 FROM docker.m.daocloud.io/library/rust:bookworm
 
-RUN apt-get update && \
-    apt-get install -y wget gnupg && \
+ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static
+ENV RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
+
+# Use domestic mirrors and avoid fallback to deb.debian.org.
+RUN rm -f /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list && \
+    echo "deb https://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian-security/ bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends wget gnupg ca-certificates && \
     wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
     echo "deb http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm main" >> /etc/apt/sources.list
 
@@ -11,12 +19,20 @@ RUN apt-get update \
         pkg-config libglib2.0-dev git libslirp-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN cargo install cargo-binutils axconfig-gen cargo-axplat
+# 配置cargo使用国内镜像源
+RUN mkdir -p ~/.cargo && \
+    echo '[source.crates-io]' > ~/.cargo/config.toml && \
+    echo 'replace-with = "ustc"' >> ~/.cargo/config.toml && \
+    echo '[source.ustc]' >> ~/.cargo/config.toml && \
+    echo 'registry = "https://mirrors.ustc.edu.cn/crates.io-index"' >> ~/.cargo/config.toml && \
+    echo '[net]' >> ~/.cargo/config.toml && \
+    echo 'git-fetch-with-cli = true' >> ~/.cargo/config.toml
 
 COPY rust-toolchain.toml /rust-toolchain.toml
 
 RUN rustc --version
 
+# 使用代理下载 musl 工具链
 RUN wget https://musl.cc/aarch64-linux-musl-cross.tgz \
     && wget https://musl.cc/riscv64-linux-musl-cross.tgz \
     && wget https://musl.cc/x86_64-linux-musl-cross.tgz \
@@ -27,7 +43,8 @@ RUN wget https://musl.cc/aarch64-linux-musl-cross.tgz \
     && tar zxf loongarch64-linux-musl-cross.tgz \
     && rm -f *.tgz
 
-RUN wget https://download.qemu.org/qemu-9.2.4.tar.xz \
+# 使用代理下载QEMU
+RUN wget https://mirror.iscas.ac.cn/qemu/v9.2.4/qemu-9.2.4.tar.xz \
     && tar xf qemu-9.2.4.tar.xz \
     && cd qemu-9.2.4 \
     && ./configure --prefix=/qemu-bin-9.2.4 \
