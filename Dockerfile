@@ -1,7 +1,9 @@
-FROM rust:slim
+FROM docker.m.daocloud.io/library/rust:bookworm
 
-RUN echo /etc/apt/sources.list << deb http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm main
-RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+RUN apt-get update && \
+    apt-get install -y wget gnupg && \
+    wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    echo "deb http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm main" >> /etc/apt/sources.list
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libclang-19-dev wget make python3 \
